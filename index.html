@@ -174,30 +174,6 @@
 
             // 1) asset_id 직접 일치
             let { data: rows } = await db.from('assets').select('*').eq('asset_id', raw);
-
-            // 2) asset_id에서 - 제거 후 비교
-            if (!rows?.length) {
-                const { data: all } = await db.from('assets').select('*').eq('department', currentDept);
-                rows = (all || []).filter(a => a.asset_id.replace(/-/g,'') === noDash);
-            }
-
-            // 3) registration_no로 검색
-            if (!rows?.length) {
-                const { data: r } = await db.from('assets').select('*').eq('registration_no', raw);
-                rows = r || [];
-            }
-
-            if (!rows?.length) { showAlert('fail', `자산번호 ${raw} — 목록에 없는 자산입니다`); return; }
-            const a = rows[0];
-            if (a.department !== currentDept) { showAlert('fail', `${raw} — 이 부서 소속이 아닙니다 (${a.department})`); return; }
-            if (a.checked) { showAlert('warn', `${a.asset_id} [${a.name}] — 이미 확인된 자산입니다`); return; }
-            
-            // 데이터베이스 업데이트
-            await db.from('assets').update({ 
-                checked: true, 
-                checked_by: currentUser.name, 
-                checked_at: new Date().toISOString() 
-            }).eq('id', a.id);
             
             showAlert('ok', `✅ ${a.asset_id} [${a.name}] — 확인 완료!`);
             updateProgress(); 
