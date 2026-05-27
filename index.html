@@ -1,3 +1,4 @@
+HTML
 <!DOCTYPE html>
 <html lang="ko">
 <head>
@@ -26,6 +27,7 @@
             box-shadow: 0 4px 10px rgba(0,0,0,0.1);
             background: #fff;
         }
+        /* 스캐너 화면 크기 조절 */
         #reader {
             width: 100%;
         }
@@ -62,11 +64,6 @@
         .btn:hover {
             background-color: #0056b3;
         }
-        /* 알림창 스타일 추가 */
-        .alert { padding: 12px; margin: 10px 0; border-radius: 6px; font-weight: bold; display: none; }
-        .alert-ok { background-color: #d4edda; color: #155724; }
-        .alert-fail { background-color: #f8d7da; color: #721c24; }
-        .alert-warn { background-color: #fff3cd; color: #856404; }
     </style>
 </head>
 <body>
@@ -77,8 +74,6 @@
         <div id="reader"></div>
     </div>
 
-    <div id="alert-box" class="alert"></div>
-
     <div id="result-box">
         <div class="result-title">인식된 바코드 데이터</div>
         <div id="result" class="result-text">바코드를 화면에 맞춰주세요.</div>
@@ -86,45 +81,29 @@
     </div>
 
     <script>
-        // ── 기본 환경 변수 선언 (Supabase 설정 등이 위에 살아있다면 자동 연동됩니다) ──
-        if (typeof db === 'undefined') {
-            window.db = {
-                from: () => ({
-                    select: () => ({
-                        eq: () => ({ data: [] }),
-                        update: () => ({ eq: () => ({}) })
-                    }),
-                    update: () => ({ eq: () => ({}) })
-                })
-            };
-        }
-        if (typeof currentDept === 'undefined') window.currentDept = '기본부서';
-        if (typeof currentUser === 'undefined') window.currentUser = { name: '작업자' };
-        if (typeof updateProgress === 'undefined') window.updateProgress = () => {};
-        if (typeof renderSvList === 'undefined') window.renderSvList = () => {};
-
-
         let html5QrCode;
-        let lastScanned = '', lastScannedTime = 0; // 중복 방지 변수
 
         function startScanner() {
             document.getElementById('result').innerText = "바코드를 화면에 맞춰주세요.";
             document.getElementById('result').style.color = "#007bff";
-            hideAlerts();
 
+            // 기존 스캐너 인스턴스가 있다면 정리
             if (html5QrCode) {
                 html5QrCode.clear();
             }
 
             html5QrCode = new Html5Qrcode("reader");
             
+            // 스캐너 설정 (정밀도 및 초당 프레임 수)
             const config = { 
                 fps: 15, 
                 qrbox: function(viewfinderWidth, viewfinderHeight) {
+                    // 바코드는 가로가 기므로 직사각형 형태로 스캔 영역 지정
                     return { width: viewfinderWidth * 0.8, height: viewfinderHeight * 0.3 };
                 }
             };
 
+            // 후면 카메라(environment) 우선 사용 요청
             html5QrCode.start(
                 { facingMode: "environment" }, 
                 config,
@@ -137,63 +116,29 @@
             });
         }
 
-        // 스캔 성공 시 실행되는 구역
+        // 스캔 성공 시 실행될 콜백 함수
         function onScanSuccess(decodedText, decodedResult) {
-            const now = Date.now();
-            const trimmedText = decodedText.trim();
-
-            // 💡 3초 이내 중복 스캔 방지 로직 장착
-            if (trimmedText === lastScanned && now - lastScannedTime < 3000) return;
-            lastScanned = trimmedText;
-            lastScannedTime = now;
-
+            // 진동 피드백 (스마트폰 지원 기능)오후 4:31 2026-05-27오후 4:31 2026-05-27오후 4:31 2026-05-27오후 4:31 2026-05-27오후 4:31 2026-05-27오후 4:31 2026-05-27오후 4:31 2026-05-27오후 4:31 2026-05-27오후 4:31 2026-05-27오후 4:31 2026-05-27오후 4:31 2026-05-27오후 4:31 2026-05-27
             if (navigator.vibrate) navigator.vibrate(100);
 
-            // 화면 가이드에 텍스트 바로 출력
-            document.getElementById('result').innerText = trimmedText;
+            // 결과 화면에 출력
+            document.getElementById('result').innerText = decodedText;
             document.getElementById('result').style.color = "#28a745";
             
-            // 💡 자동 정지 처리 후 데이터베이스에서 자산 검색
+            // 성공 후 자동 스탑 (원치 않으면 주석 처리)
             html5QrCode.stop().then((ignore) => {
-                console.log("조회를 위해 카메라 일시정지");
-                checkAsset(trimmedText); // 자산 조회 함수 실행
+                console.log("스캔 성공으로 카메라 일시정지");
             }).catch((err) => {
                 console.error("카메라 정지 실패:", err);
             });
         }
 
+        // 스캔 실패 시 실행될 콜백 함수 (프레임마다 바코드가 없으면 계속 호출됨)
         function onScanFailure(error) {
-            // 프레임 탐색 에러 생략
+            // 콘솔이 너무 복잡해지므로 대다수 에러는 무시합니다.
         }
 
-        // ── 💡 합쳐진 데이터베이스 자산 검증 로직 ───────────────────────
-        async function checkAsset(assetId) {
-            hideAlerts();
-            const raw = assetId.trim();
-            const noDash = raw.replace(/-/g, '');
-
-            // 1) asset_id 직접 일치
-            let { data: rows } = await db.from('assets').select('*').eq('asset_id', raw);
-            
-            showAlert('ok', `✅ ${a.asset_id} [${a.name}] — 확인 완료!`);
-            updateProgress(); 
-            renderSvList('');
-        }
-
-        // 알림 제어용 유틸리티 함수
-        function showAlert(type, message) {
-            const box = document.getElementById('alert-box');
-            if(!box) return;
-            box.className = `alert alert-${type}`;
-            box.innerText = message;
-            box.style.display = 'block';
-        }
-
-        function hideAlerts() {
-            const box = document.getElementById('alert-box');
-            if(box) box.style.display = 'none';
-        }
-
+        // 페이지 로드 시 자동으로 스캐너 시작
         window.addEventListener('DOMContentLoaded', startScanner);
     </script>
 </body>
