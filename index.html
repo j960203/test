@@ -963,41 +963,62 @@ async function startScan() {
   document.getElementById('qr-scanner-wrap').style.display = 'block';
   hideAlerts();
   try {
-    const hints = {
-      possibleFormats: [
-        ZXing.BarcodeFormat.CODE_128,
-        ZXing.BarcodeFormat.CODE_39,
-        ZXing.BarcodeFormat.QR_CODE
-      ],
-      tryHarder: true
-    };
+    // ZXing 버전 호환성을 위해 Map과 Object 둘 다 안전하게 설정
+    const hints = new Map();
+    const formats = [
+      ZXing.BarcodeFormat.CODE_128,
+      ZXing.BarcodeFormat.CODE_39,
+      ZXing.BarcodeFormat.QR_CODE
+    ];
+    hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, formats);
+    hints.set(ZXing.DecodeHintType.TRY_HARDER, true);
 
     codeReader = new ZXing.BrowserMultiFormatReader(hints);
     const video = document.getElementById('qr-video');
 
-    // 1. 연결된 카메라 장치 목록을 전부 가져옵니다.
-    const videoInputDevices = await ZXing.BrowserMultiFormatReader.listVideoInputDevices();
-    
-    // 2. 후면(back/environment) 카메라를 찾고, 없으면 가장 첫 번째 카메라 선택
-    let selectedDeviceId = videoInputDevices[0].deviceId;
-    for (const device of videoInputDevices) {
-      if (device.label.toLowerCase().includes('back') || device.label.toLowerCase().includes('후면')) {
-        selectedDeviceId = device.deviceId;
-        break;
+    let constraints;
+
+    try {
+      // 1. 카메라 장치 목록 가져오기 시도
+      const videoInputDevices = await ZXing.BrowserMultiFormatReader.listVideoInputDevices();
+      
+      if (videoInputDevices && videoInputDevices.length > 0) {
+        // 후면 카메라 검색
+        let selectedDeviceId = videoInputDevices[0].deviceId;
+        for (const device of videoInputDevices) {
+          const label = device.label.toLowerCase();
+          if (label.includes('back') || label.includes('후면') || label.includes('environment')) {
+            selectedDeviceId = device.deviceId;
+            break;
+          }
+        }
+        
+        // 💡 고친 부분: exact 대신 ideal을 사용하여 장치 지정을 유연하게 만듭니다.
+        constraints = {
+          video: {
+            deviceId: { ideal: selectedDeviceId }, 
+            facingMode: 'environment',
+            width: { ideal: 1280 },
+            height: { ideal: 720 }
+          }
+        };
       }
+    } catch (deviceErr) {
+      console.warn("장치 목록을 가져오지 못했습니다. 기본 설정으로 대체합니다.", deviceErr);
     }
 
-    // 3. 해상도 및 초점 옵션 설정
-    const constraints = {
-      video: {
-        deviceId: { exact: selectedDeviceId },
-        width: { ideal: 1280 },
-        height: { ideal: 720 },
-        focusMode: 'continuous'
-      }
-    };
+    // 2. 만약 장치 목록 조회가 아예 실패했다면 모바일 표준 후면 카메라 설정으로 자동 전환
+    if (!constraints) {
+      constraints = {
+        video: {
+          facingMode: { exact: 'environment' },
+          width: { ideal: 1280 },
+          height: { ideal: 720 }
+        }
+      };
+    }
 
-    // 4. 지정된 카메라 장치 ID로 스캔 시작
+    // 3. 스캔 시작
     await codeReader.decodeFromConstraints(
       constraints,
       video,
@@ -1012,12 +1033,11 @@ async function startScan() {
       }
     );
   } catch(e) {
-    console.error(e);
-    showAlert('fail', '카메라를 시작할 수 없거나 권한이 없습니다.');
+    console.error("최종 스캔 시작 실패:", e);
+    showAlert('fail', '카메라를 시작할 수 없거나 권한이 없습니다. HTTPS 연결 및 브라우저 권한 설정을 확인해 주세요.');
     stopScan();
   }
 }
-
 function stopScan() {
   if (codeReader) { codeReader.reset(); codeReader = null; }
   const a = document.getElementById('qr-start-area');
