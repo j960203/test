@@ -951,20 +951,7 @@ async function loadMyLog() {
     </div>`).join('');
 }
 
-  async function checkAsset(assetId) {
-  hideAlerts();
-  const raw = assetId.trim();
-  
-  // 💡 여기에 추가: 인식된 바코드 raw 값을 화면 텍스트에 바로 찍어줍니다.
-  const resultDisplay = document.getElementById('scanned-result-text');
-  if (resultDisplay) {
-      resultDisplay.innerText = `스캔된 바코드: ${raw}`;
-  }
 
-  const noDash = raw.replace(/-/g, '');
-
-  // 1) asset_id 직접 일치
-  let { data: rows } = await db.from('assets').select('*').eq('asset_id', raw);
 
 // ── QR 스캔 ───────────────────────────────────────
 let codeReader = null;
@@ -1045,6 +1032,11 @@ async function checkAsset(assetId) {
   hideAlerts();
   const raw = assetId.trim();
   const noDash = raw.replace(/-/g, '');
+
+  const resultDisplay = document.getElementById('scanned-result-text');
+  if (resultDisplay) {
+      resultDisplay.innerText = `스캔된 바코드: ${raw}`;
+  }
 
   // 1) asset_id 직접 일치
   let { data: rows } = await db.from('assets').select('*').eq('asset_id', raw);
