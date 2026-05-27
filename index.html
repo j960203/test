@@ -3,8 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-<title>건국대학교(글로컬) 재물조사 시스템</title>
-<script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+<title>건국대학교(글로컬) 재물조사 시스템 (로컬 단독 모드)</title>
 <script src="https://unpkg.com/html5-qrcode"></script>
 <style>
   :root {
@@ -173,7 +172,7 @@
     <div id="admin-fields">
       <div class="field">
         <label>관리자 비밀번호</label>
-        <input id="admin-pw" type="password" placeholder="비밀번호 입력" onkeydown="if(event.key==='Enter')login()">
+        <input id="admin-pw" type="password" placeholder="비밀번호 입력" value="3856!" onkeydown="if(event.key==='Enter')login()">
       </div>
     </div>
 
@@ -211,7 +210,7 @@
 <div id="app">
   <div class="topbar">
     <div style="display:flex;align-items:center;gap:10px">
-      <div class="app-title">📋 재물조사</div>
+      <div class="app-title">📋 재물조사 (단독 로컬 모드)</div>
       <span class="user-badge" id="user-badge"></span>
     </div>
     <button class="logout-btn" onclick="logout()">로그아웃</button>
@@ -245,13 +244,11 @@
       <div id="admin-request-list"></div>
     </div>
   </div>
+  
   <div id="screen-dept" class="screen">
     <div class="card">
-      <div class="card-title">🏢 부서 추가</div>
-      <div class="row">
-        <input id="new-dept-input" placeholder="새 부서명 입력" style="flex:1;padding:9px 10px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:13px;outline:none;">
-        <button class="btn btn-primary" onclick="addDept()">추가</button>
-      </div>
+      <div class="card-title">🏢 부서 추가 안내</div>
+      <p style="font-size:12px;color:var(--text2)">로컬 단독 모드에서는 하단의 '자산 관리' 탭에서 자산을 등록하거나 CSV를 올리면 해당 부서가 자동으로 생성됩니다.</p>
     </div>
     <div class="card">
       <div class="card-title">📊 부서별 조사 현황</div>
@@ -261,8 +258,8 @@
 
   <div id="screen-asset" class="screen">
     <div class="card">
-      <div class="card-title">📤 자산 업로드</div>
-      <div class="row"><label>부서 선택</label><select id="upload-dept-sel"></select></div>
+      <div class="card-title">📤 자산 업로드 (임시 등록)</div>
+      <div class="row"><label>기본 부서</label><select id="upload-dept-sel"></select></div>
       <div class="upload-box" onclick="document.getElementById('csv-file').click()">
         <div class="upload-icon">📄</div>
         <div style="font-size:13px;font-weight:500;margin-bottom:4px">CSV 파일 업로드</div>
@@ -311,7 +308,7 @@
     <div id="account-type-stats"></div>
 
     <div class="card">
-      <div class="card-title"><span class="live-dot"></span>실시간 조사 로그</div>
+      <div class="card-title"><span class="live-dot"></span>실시간 조사 로그 (로컬)</div>
       <div class="row" style="margin-bottom:12px">
         <label>부서 필터</label>
         <select id="log-dept-filter" onchange="loadLog()">
@@ -479,29 +476,25 @@
 </div>
 
 <script>
-const SUPABASE_URL = 'https://guhecafpwakaamanholw.supabase.co';
-const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imd1aGVjYWZwd2FrYWFtYW5ob2x3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkzMzg1ODMsImV4cCI6MjA5NDkxNDU4M30.rGANFCfg5s9w7Eo2V3s0-KKQewei_rvuHD5qlXeDh84';
+// ─── 🛑 DB 연결부(Supabase 정보)를 완전히 제거하고 로컬 가상 배열 데이터로 전면 교체 ───
 const ADMIN_PASSWORD = '3856!';
 const ALLSCAN_PASSWORD = '3855';
 let currentScanMode = 'normal';
 
-function selectScanMode(mode, btn) {
-  currentScanMode = mode;
-  document.getElementById('mode-btn-normal').classList.toggle('active', mode === 'normal');
-  document.getElementById('mode-btn-all').classList.toggle('active', mode === 'all');
-  document.getElementById('all-scan-pw-field').style.display = mode === 'all' ? 'block' : 'none';
-  if (mode === 'normal') document.getElementById('all-scan-pw').value = '';
-}
+// 초기에 보여줄 가상 Mock 자산 데이터 리스트
+let mockAssets = [
+  { asset_id: "A-0001", item_name: "사무용 컴퓨터", location: "101호", price: 1200000, department: "기획예산팀", registration_date: "2024-01-10", accounting_type: "대학회계", is_checked: false },
+  { asset_id: "A-0002", item_name: "회의용 모니터", location: "102호", price: 450000, department: "기획예산팀", registration_date: "2024-02-11", accounting_type: "대학회계", is_checked: false },
+  { asset_id: "S-0001", item_name: "연구용 실험장비 A", location: "공학관 303호", price: 8500000, department: "산학협력단", registration_date: "2023-11-05", accounting_type: "산단회계", is_checked: false },
+  { asset_id: "S-0002", item_name: "프로젝트용 서버PC", location: "공학관 304호", price: 3200000, department: "산학협력단", registration_date: "2023-12-20", accounting_type: "산단회계", is_checked: false }
+];
+let mockRequests = []; // 변경신청 내역 저장용 로컬 배열
 
-const { createClient } = supabase;
-const db = createClient(SUPABASE_URL, SUPABASE_KEY);
 let currentUser = null;
 let currentRole = 'admin';
 let currentDept = null;
-let realtimeSub = null;
 let allDeptData = [];
 
-// Html5Qrcode 인스턴스를 관리할 글로벌 전역 변수
 let html5QrCodeNormal = null;
 let html5QrCodeAll = null;
 let lastScanned = '', lastScannedTime = 0;
@@ -512,7 +505,7 @@ function selectRole(role, btn) {
   btn.classList.add('active');
   document.getElementById('admin-fields').style.display = role === 'admin' ? 'block' : 'none';
   document.getElementById('surveyor-fields').style.display = role === 'surveyor' ? 'block' : 'none';
-  document.getElementById('admin-pw').value = '';
+  document.getElementById('admin-pw').value = '3856!';
   document.getElementById('sv-name').value = '';
   document.getElementById('sv-dept-input').value = '';
 }
@@ -565,16 +558,13 @@ function login() {
     document.getElementById('surveyor-tabs').style.display = 'flex';
     switchTab('surveyor', 'svdept');
   }
-  startRealtime();
 }
 
 function logout() {
-  if (realtimeSub) db.removeChannel(realtimeSub);
   stopScan();
   stopScanAll();
   currentUser = null;
   currentDept = null;
-  allDeptData = [];
   currentScanMode = 'normal';
   const allWrap = document.getElementById('sv-allscan-wrap');
   if (allWrap) allWrap.style.display = 'none';
@@ -588,6 +578,22 @@ function logout() {
 window.onload = () => {
   document.getElementById('admin-fields').style.display = 'block';
 };
+
+function triggerLocalUpdate() {
+  // DB 실시간 채널 역할을 대신하는 화면 갱신 함수
+  if (currentRole === 'admin') {
+    loadDeptSummary();
+    loadReport();
+    loadLog();
+    if (document.getElementById('screen-asset')?.classList.contains('active')) loadAssets();
+  } else {
+    if (currentDept) {
+      updateProgress();
+      renderSvList('');
+    }
+    loadSvDeptList();
+  }
+}
 
 function switchTab(role, tab) {
   const screens = {
@@ -619,27 +625,7 @@ function switchTab(role, tab) {
   if (tab === 'adminrequest') { loadAdminRequests(); }
 }
 
-function startRealtime() {
-  realtimeSub = db.channel('assets-ch')
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'assets' }, () => {
-      if (currentRole === 'admin') {
-        loadDeptSummary();
-        loadReport();
-        loadLog();
-        if (document.getElementById('screen-asset')?.classList.contains('active')) loadAssets();
-      } else {
-        if (currentDept) {
-          updateProgress();
-          renderSvList('');
-        }
-        loadSvDeptList();
-      }
-    }).subscribe();
-}
-
-/* ─── 📷 [변경 부문] Html5Qrcode 구현 연동 ─── */
-
-// 1. 담당 부서 조사용 스캐너 (Normal Mode)
+/* ─── 📷 스캐너 연동 ─── */
 async function startScan() {
   document.getElementById('qr-start-area').style.display = 'none';
   document.getElementById('qr-scanner-wrap').style.display = 'block';
@@ -648,18 +634,8 @@ async function startScan() {
   if (html5QrCodeNormal) {
     try { await html5QrCodeNormal.clear(); } catch(e) {}
   }
-
   html5QrCodeNormal = new Html5Qrcode("reader");
-  
-  const config = { 
-    fps: 15, 
-    qrbox: function(viewfinderWidth, viewfinderHeight) {
-      return { 
-        width: Math.floor(viewfinderWidth * 0.8), 
-        height: Math.floor(viewfinderHeight * 0.3) 
-      };
-    }
-  };
+  const config = { fps: 15, qrbox: (w, h) => ({ width: Math.floor(w * 0.8), height: Math.floor(h * 0.3) }) };
 
   try {
     await html5QrCodeNormal.start(
@@ -669,33 +645,24 @@ async function startScan() {
         const now = Date.now();
         const trimmedText = decodedText.trim();
         if (trimmedText === lastScanned && now - lastScannedTime < 3000) return;
-        
-        lastScanned = trimmedText;
-        lastScannedTime = now;
-
+        lastScanned = trimmedText; lastScannedTime = now;
         if (navigator.vibrate) navigator.vibrate(100);
 
-        // 연산 안전을 위해 정지 후 결과 프로세스 작동
         html5QrCodeNormal.stop().then(() => {
           checkAsset(trimmedText);
-        }).catch(err => console.error("카메라 정지 오류:", err));
+        }).catch(err => console.error(err));
       },
-      (errorMessage) => {}
+      () => {}
     );
   } catch (err) {
-    console.error("카메라 작동 에러:", err);
-    showAlert('fail', '카메라 권한이 필요합니다. 브라우저 설정에서 카메라를 허용해주세요.');
+    showAlert('fail', '카메라 권한이 필요합니다.');
     stopScan();
   }
 }
 
 async function stopScan() {
   if (html5QrCodeNormal) {
-    try {
-      await html5QrCodeNormal.stop();
-    } catch (err) {
-      console.error("카메라 정지 에러:", err);
-    }
+    try { await html5QrCodeNormal.stop(); } catch(e) {}
     html5QrCodeNormal = null;
   }
   const a = document.getElementById('qr-start-area');
@@ -704,7 +671,6 @@ async function stopScan() {
   if (b) b.style.display = 'none';
 }
 
-// 2. 전체 조사 모드용 스캐너 (All Mode)
 async function startScanAll() {
   document.getElementById('qr-start-area-all').style.display = 'none';
   document.getElementById('qr-scanner-wrap-all').style.display = 'block';
@@ -713,18 +679,8 @@ async function startScanAll() {
   if (html5QrCodeAll) {
     try { await html5QrCodeAll.clear(); } catch(e) {}
   }
-
   html5QrCodeAll = new Html5Qrcode("reader-all");
-  
-  const config = { 
-    fps: 15, 
-    qrbox: function(viewfinderWidth, viewfinderHeight) {
-      return { 
-        width: Math.floor(viewfinderWidth * 0.8), 
-        height: Math.floor(viewfinderHeight * 0.3) 
-      };
-    }
-  };
+  const config = { fps: 15, qrbox: (w, h) => ({ width: Math.floor(w * 0.8), height: Math.floor(h * 0.3) }) };
 
   try {
     await html5QrCodeAll.start(
@@ -734,33 +690,24 @@ async function startScanAll() {
         const now = Date.now();
         const trimmedText = decodedText.trim();
         if (trimmedText === lastScanned && now - lastScannedTime < 3000) return;
-        
-        lastScanned = trimmedText;
-        lastScannedTime = now;
-
+        lastScanned = trimmedText; lastScannedTime = now;
         if (navigator.vibrate) navigator.vibrate(100);
 
-        // 연산 안전을 위해 정지 후 결과 프로세스 작동
         html5QrCodeAll.stop().then(() => {
           checkAssetAll(trimmedText);
-        }).catch(err => console.error("카메라 정지 오류:", err));
+        }).catch(err => console.error(err));
       },
-      (errorMessage) => {}
+      () => {}
     );
   } catch (err) {
-    console.error("전체 스캐너 작동 에러:", err);
-    alert('카메라 권한이 필요합니다. 설정에서 카메라를 허용해주세요.');
+    alert('카메라 권한이 필요합니다.');
     stopScanAll();
   }
 }
 
 async function stopScanAll() {
   if (html5QrCodeAll) {
-    try {
-      await html5QrCodeAll.stop();
-    } catch (err) {
-      console.error("카메라 정지 에러:", err);
-    }
+    try { await html5QrCodeAll.stop(); } catch(e) {}
     html5QrCodeAll = null;
   }
   const a = document.getElementById('qr-start-area-all');
@@ -769,63 +716,50 @@ async function stopScanAll() {
   if (b) b.style.display = 'none';
 }
 
-// 기존 ZXing의 후속 연산 프레임 함수는 불필요하므로 생략하거나 구조 유지 처리
-function scanFrame(video) {}
-
-/* ─── 이하 기존 비즈니스 로직 및 Supabase 통신 연동 ─── */
-// (기존 시스템 함수들을 빠짐없이 채워넣어 완전한 상태로 복원해 둡니다)
-
 function hideAlerts() {
   ['ok','fail','warn'].forEach(t => {
     const el = document.getElementById('alert-'+t);
     if (el) { el.style.display = 'none'; el.textContent = ''; }
   });
 }
-
 function hideAlertsAll() {
   ['all','fail-all','warn-all'].forEach(t => {
     const el = document.getElementById('alert-'+t);
     if (el) { el.style.display = 'none'; el.textContent = ''; }
   });
 }
-
 function showAlert(type, msg) {
   const el = document.getElementById('alert-'+type);
   if (el) { el.style.display = 'block'; el.textContent = msg; }
 }
 
-async function checkAsset(code) {
+/* ─── 💾 로컬 가상 비즈니스 로직 연동 부문 ─── */
+function checkAsset(code) {
   hideAlerts();
-  try {
-    const { data, error } = await db.from('assets').select('*').eq('asset_id', code).single();
-    if (error || !data) {
-      showAlert('fail', `❌ 미등록 자산: [${code}] 시스템에 존재하지 않는 자산번호입니다.`);
-      return;
-    }
-    if (data.department !== currentDept) {
-      showAlert('warn', `⚠️ 부서 불일치: [${data.item_name}] 물품은 원래 [${data.department}] 소속입니다. (현재 선택된 부서: ${currentDept})`);
-      return;
-    }
-    if (data.is_checked) {
-      showAlert('warn', `ℹ️ 이미 조사 완료된 자산입니다: [${data.item_name}] (${data.location})`);
-      return;
-    }
-    
-    const { error: updErr } = await db.from('assets').update({
-      is_checked: true,
-      checked_by: currentUser.name,
-      checked_at: new Date().toISOString(),
-      surveyor_affiliation: currentUser.affiliation
-    }).eq('asset_id', code);
-
-    if (updErr) throw updErr;
-    showAlert('ok', `✅ 조사 완료: [${data.item_name}] (${data.location}) 확인되었습니다.`);
-  } catch (e) {
-    showAlert('fail', '오류 발생: ' + e.message);
+  const data = mockAssets.find(a => a.asset_id === code);
+  if (!data) {
+    showAlert('fail', `❌ 미등록 자산: [${code}] 시스템에 존재하지 않는 자산번호입니다.`);
+    return;
   }
+  if (data.department !== currentDept) {
+    showAlert('warn', `⚠️ 부서 불일치: [${data.item_name}] 물품은 원래 [${data.department}] 소속입니다. (현재 선택 부서: ${currentDept})`);
+    return;
+  }
+  if (data.is_checked) {
+    showAlert('warn', `ℹ️ 이미 조사 완료된 자산입니다: [${data.item_name}] (${data.location})`);
+    return;
+  }
+  
+  data.is_checked = true;
+  data.checked_by = currentUser.name;
+  data.checked_at = new Date().toISOString();
+  data.surveyor_affiliation = currentUser.affiliation;
+
+  showAlert('ok', `✅ 조사 완료: [${data.item_name}] (${data.location}) 확인되었습니다.`);
+  triggerLocalUpdate();
 }
 
-async function checkAssetAll(code) {
+function checkAssetAll(code) {
   const okEl = document.getElementById('alert-ok-all');
   const failEl = document.getElementById('alert-fail-all');
   const warnEl = document.getElementById('alert-warn-all');
@@ -833,34 +767,27 @@ async function checkAssetAll(code) {
   if (failEl) failEl.style.display = 'none';
   if (warnEl) warnEl.style.display = 'none';
 
-  try {
-    const { data, error } = await db.from('assets').select('*').eq('asset_id', code).single();
-    if (error || !data) {
-      if (failEl) { failEl.style.display = 'block'; failEl.textContent = `❌ 미등록 자산: [${code}] 시스템에 존재하지 않습니다.`; }
-      return;
-    }
-    if (data.is_checked) {
-      if (warnEl) { warnEl.style.display = 'block'; warnEl.textContent = `ℹ️ 이미 조사 완료됨: [${data.item_name}] - 소속: [${data.department}]`; }
-      return;
-    }
-
-    const { error: updErr } = await db.from('assets').update({
-      is_checked: true,
-      checked_by: currentUser.name,
-      checked_at: new Date().toISOString(),
-      surveyor_affiliation: currentUser.affiliation
-    }).eq('asset_id', code);
-
-    if (updErr) throw updErr;
-    if (okEl) { okEl.style.display = 'block'; okEl.textContent = `✅ [총괄] 조사 확정: [${data.item_name}] (소속: ${data.department} / 위치: ${data.location})`; }
-  } catch (e) {
-    if (failEl) { failEl.style.display = 'block'; failEl.textContent = '오류: ' + e.message; }
+  const data = mockAssets.find(a => a.asset_id === code);
+  if (!data) {
+    if (failEl) { failEl.style.display = 'block'; failEl.textContent = `❌ 미등록 자산: [${code}] 시스템에 존재하지 않습니다.`; }
+    return;
   }
+  if (data.is_checked) {
+    if (warnEl) { warnEl.style.display = 'block'; warnEl.textContent = `ℹ️ 이미 조사 완료됨: [${data.item_name}] - 소속: [${data.department}]`; }
+    return;
+  }
+
+  data.is_checked = true;
+  data.checked_by = currentUser.name;
+  data.checked_at = new Date().toISOString();
+  data.surveyor_affiliation = currentUser.affiliation;
+
+  if (okEl) { okEl.style.display = 'block'; okEl.textContent = `✅ [총괄] 조사 확정: [${data.item_name}] (소속: ${data.department} / 위치: ${data.location})`; }
+  triggerLocalUpdate();
 }
 
-async function loadDepts() {
-  const { data } = await db.from('assets').select('department');
-  const depts = [...new Set((data || []).map(d => d.department).filter(Boolean))].sort();
+function loadDepts() {
+  const depts = [...new Set(mockAssets.map(d => d.department).filter(Boolean))].sort();
   allDeptData = depts;
   
   ['upload-dept-sel', 'm-dept-sel', 'asset-filter', 'log-dept-filter', 'sandan-dept-filter-all'].forEach(id => {
@@ -877,10 +804,9 @@ async function loadDepts() {
   });
 }
 
-async function loadDeptSummary() {
-  const { data: assets } = await db.from('assets').select('department, is_checked');
+function loadDeptSummary() {
   const summary = {};
-  (assets || []).forEach(a => {
+  mockAssets.forEach(a => {
     if (!a.department) return;
     if (!summary[a.department]) summary[a.department] = { total: 0, checked: 0 };
     summary[a.department].total++;
@@ -899,10 +825,9 @@ async function loadDeptSummary() {
   document.getElementById('dept-summary').innerHTML = html || '<div class="empty">등록된 부서 데이터가 없습니다.</div>';
 }
 
-async function loadSvDeptList() {
-  const { data: assets } = await db.from('assets').select('department, is_checked');
+function loadSvDeptList() {
   const summary = {};
-  (assets || []).forEach(a => {
+  mockAssets.forEach(a => {
     if (!a.department) return;
     if (!summary[a.department]) summary[a.department] = { total: 0, checked: 0 };
     summary[a.department].total++;
@@ -968,9 +893,9 @@ function switchAllScanTab(type) {
   if (type === 'sandan') renderSandanAllList('');
 }
 
-async function updateProgress() {
+function updateProgress() {
   if (!currentDept) return;
-  const { data } = await db.from('assets').select('is_checked').eq('department', currentDept);
+  const data = mockAssets.filter(a => a.department === currentDept);
   const total = data.length;
   const checked = data.filter(a => a.is_checked).length;
   const pct = total ? Math.round((checked / total) * 100) : 0;
@@ -979,17 +904,14 @@ async function updateProgress() {
   document.getElementById('sv-prog-label').textContent = `전체 ${total}건 중 ${checked}건 완료 (${pct}%)`;
 }
 
-async function renderSvList(keyword, forceAccountType) {
+function renderSvList(keyword, forceAccountType) {
   if (!currentDept) return;
-  let query = db.from('assets').select('*').eq('department', currentDept);
-  const kw = keyword.trim();
-  
-  const { data: list } = await query;
-  if (!list) return;
+  const kw = keyword.trim().toLowerCase();
+  const list = mockAssets.filter(a => a.department === currentDept);
 
   const filtered = list.filter(item => {
     if (!kw) return true;
-    return item.item_name.includes(kw) || item.asset_id.includes(kw);
+    return item.item_name.toLowerCase().includes(kw) || item.asset_id.toLowerCase().includes(kw);
   });
 
   const univList = filtered.filter(a => a.accounting_type !== '산단회계');
@@ -1024,54 +946,51 @@ async function renderSvList(keyword, forceAccountType) {
   }
 }
 
-async function toggleSandanCheck(assetId, currentStatus) {
+function toggleSandanCheck(assetId, currentStatus) {
   if (confirm(`[산단회계] 등재번호 ${assetId} 물품의 상태를 변경하시겠습니까?`)) {
-    const nextStatus = !currentStatus;
-    const updateData = {
-      is_checked: nextStatus,
-      checked_by: nextStatus ? currentUser.name : null,
-      checked_at: nextStatus ? new Date().toISOString() : null,
-      surveyor_affiliation: nextStatus ? currentUser.affiliation : null
-    };
-    await db.from('assets').update(updateData).eq('asset_id', assetId);
+    const data = mockAssets.find(a => a.asset_id === assetId);
+    if(data) {
+      const nextStatus = !currentStatus;
+      data.is_checked = nextStatus;
+      data.checked_by = nextStatus ? currentUser.name : null;
+      data.checked_at = nextStatus ? new Date().toISOString() : null;
+      data.surveyor_affiliation = nextStatus ? currentUser.affiliation : null;
+      triggerLocalUpdate();
+    }
   }
 }
 
-async function sandanManualCheck() {
+function sandanManualCheck() {
   const input = document.getElementById('sandan-input');
   const code = input.value.trim();
   if (!code) return;
   hideAlerts();
   
-  const { data, error } = await db.from('assets').select('*').eq('asset_id', code).eq('department', currentDept).eq('accounting_type', '산단회계').single();
-  if (error || !data) {
+  const data = mockAssets.find(a => a.asset_id === code && a.department === currentDept && a.accounting_type === '산단회계');
+  if (!data) {
     showAlert('fail', `❌ 실패: 현재 부서(${currentDept})의 산단회계 목록에 [${code}] 등재번호가 존재하지 않습니다.`);
     return;
   }
   
-  await db.from('assets').update({
-    is_checked: true,
-    checked_by: currentUser.name,
-    checked_at: new Date().toISOString(),
-    surveyor_affiliation: currentUser.affiliation
-  }).eq('asset_id', code);
+  data.is_checked = true;
+  data.checked_by = currentUser.name;
+  data.checked_at = new Date().toISOString();
+  data.surveyor_affiliation = currentUser.affiliation;
   
   showAlert('ok', `✅ 확인 완료: [${data.item_name}] 실물 확인 처리되었습니다.`);
   input.value = '';
+  triggerLocalUpdate();
 }
 
-async function renderSandanAllList(keyword) {
+function renderSandanAllList(keyword) {
   const deptFilter = document.getElementById('sandan-dept-filter-all').value;
-  let query = db.from('assets').select('*').eq('accounting_type', '산단회계');
-  if (deptFilter) query = query.eq('department', deptFilter);
-  
-  const { data: list } = await query;
-  if (!list) return;
+  let list = mockAssets.filter(a => a.accounting_type === '산단회계');
+  if (deptFilter) list = list.filter(a => a.department === deptFilter);
 
-  const kw = keyword.trim();
+  const kw = keyword.trim().toLowerCase();
   const filtered = list.filter(item => {
     if (!kw) return true;
-    return item.item_name.includes(kw) || item.asset_id.includes(kw) || (item.department && item.department.includes(kw));
+    return item.item_name.toLowerCase().includes(kw) || item.asset_id.toLowerCase().includes(kw) || (item.department && item.department.toLowerCase().includes(kw));
   });
 
   const html = filtered.map(item => `
@@ -1087,7 +1006,7 @@ async function renderSandanAllList(keyword) {
   document.getElementById('sv-list-sandan-all').innerHTML = html || '<div class="empty">조건에 맞는 산단회계 자산이 존재하지 않습니다.</div>';
 }
 
-async function sandanManualCheckAll() {
+function sandanManualCheckAll() {
   const input = document.getElementById('sandan-input-all');
   const code = input.value.trim();
   if (!code) return;
@@ -1096,28 +1015,26 @@ async function sandanManualCheckAll() {
   const failEl = document.getElementById('alert-fail-sandan-all');
   okEl.style.display = 'none'; failEl.style.display = 'none';
 
-  const { data, error } = await db.from('assets').select('*').eq('asset_id', code).eq('accounting_type', '산단회계').single();
-  if (error || !data) {
+  const data = mockAssets.find(a => a.asset_id === code && a.accounting_type === '산단회계');
+  if (!data) {
     failEl.style.display = 'block'; failEl.textContent = `❌ 실패: 산단회계 전체 목록에 [${code}] 등재번호가 없습니다.`;
     return;
   }
   
-  await db.from('assets').update({
-    is_checked: true,
-    checked_by: currentUser.name,
-    checked_at: new Date().toISOString(),
-    surveyor_affiliation: currentUser.affiliation
-  }).eq('asset_id', code);
+  data.is_checked = true;
+  data.checked_by = currentUser.name;
+  data.checked_at = new Date().toISOString();
+  data.surveyor_affiliation = currentUser.affiliation;
   
   okEl.style.display = 'block'; okEl.textContent = `✅ [총괄 확인] [${data.department}] ${data.item_name} 체크 완료.`;
   input.value = '';
   renderSandanAllList('');
+  triggerLocalUpdate();
 }
 
-async function loadMyLog() {
+function loadMyLog() {
   if (!currentUser) return;
-  const { data } = await db.from('assets').select('*').eq('checked_by', currentUser.name).order('checked_at', { ascending: false });
-  const list = data || [];
+  const list = mockAssets.filter(a => a.checked_by === currentUser.name).sort((a,b) => new Date(b.checked_at) - new Date(a.checked_at));
   
   document.getElementById('sv-my-stats').innerHTML = `
     <div class="stat"><div class="stat-num" style="color:var(--accent)">${list.length}</div><div class="stat-lbl">내 스캔 총합</div></div>
@@ -1137,13 +1054,13 @@ async function loadMyLog() {
   document.getElementById('sv-my-log').innerHTML = html || '<div class="empty">조사된 내역이 없습니다.</div>';
 }
 
-async function loadMyRequestAssets() {
+function loadMyRequestAssets() {
   if (!currentUser) return;
-  const { data } = await db.from('assets').select('*').eq('checked_by', currentUser.name);
+  const data = mockAssets.filter(a => a.checked_by === currentUser.name);
   const sel = document.getElementById('req-asset-sel');
   sel.innerHTML = '<option value="">-- 자산 선택 --</option>';
-  window.myCheckedAssetsCache = data || [];
-  (data || []).forEach(a => {
+  window.myCheckedAssetsCache = data;
+  data.forEach(a => {
     const opt = document.createElement('option');
     opt.value = a.asset_id; opt.textContent = `${a.item_name} (${a.asset_id})`;
     sel.appendChild(opt);
@@ -1163,7 +1080,7 @@ function fillReqInfo() {
   document.getElementById('req-old-loc').value = asset.location || '미지정';
 }
 
-async function submitRequest() {
+function submitRequest() {
   const assetId = document.getElementById('req-asset-sel').value;
   const oldLoc = document.getElementById('req-old-loc').value;
   const newLoc = document.getElementById('req-new-loc').value.trim();
@@ -1173,25 +1090,23 @@ async function submitRequest() {
   if (!assetId || !newLoc) { alert('변경할 자산과 새로운 장소를 입력해주세요.'); return; }
   const asset = window.myCheckedAssetsCache.find(a => a.asset_id === assetId);
 
-  const { error } = await db.from('change_requests').insert({
+  mockRequests.push({
+    id: Date.now(),
     asset_id: assetId, item_name: asset.item_name, department: asset.department,
     old_location: oldLoc, new_location: newLoc, requester: currentUser.name,
-    note: note, status: '대기중'
+    note: note, status: '대기중', created_at: new Date().toISOString()
   });
 
-  if (error) { resEl.style.color = 'var(--danger)'; resEl.textContent = '신청 실패: ' + error.message; }
-  else {
-    resEl.style.color = 'var(--success)'; resEl.textContent = '🎉 정상적으로 변경 신청되었습니다.';
-    document.getElementById('req-new-loc').value = '';
-    document.getElementById('req-note').value = '';
-    loadMyRequests();
-  }
+  resEl.style.color = 'var(--success)'; resEl.textContent = '🎉 정상적으로 변경 신청되었습니다.';
+  document.getElementById('req-new-loc').value = '';
+  document.getElementById('req-note').value = '';
+  loadMyRequests();
 }
 
-async function loadMyRequests() {
+function loadMyRequests() {
   if (!currentUser) return;
-  const { data } = await db.from('change_requests').select('*').eq('requester', currentUser.name).order('created_at', { ascending: false });
-  const html = (data || []).map(r => `
+  const data = mockRequests.filter(r => r.requester === currentUser.name).sort((a,b)=>new Date(b.created_at)-new Date(a.created_at));
+  const html = data.map(r => `
     <div class="log-item">
       <div style="display:flex;justify-content:between;align-items:center;">
         <span class="log-name">${r.item_name} (${r.asset_id})</span>
@@ -1212,12 +1127,9 @@ function selectAcctType(type) {
   loadReport();
 }
 
-async function loadReport() {
-  const { data: assets } = await db.from('assets').select('is_checked, accounting_type');
-  const allList = assets || [];
-  
-  const univ = allList.filter(a => a.accounting_type !== '산단회계');
-  const sandan = allList.filter(a => a.accounting_type === '산단회계');
+function loadReport() {
+  const univ = mockAssets.filter(a => a.accounting_type !== '산단회계');
+  const sandan = mockAssets.filter(a => a.accounting_type === '산단회계');
 
   const uTot = univ.length, uChk = univ.filter(a=>a.is_checked).length;
   const uPct = uTot ? Math.round((uChk/uTot)*100) : 0;
@@ -1250,13 +1162,12 @@ async function loadReport() {
   `;
 }
 
-async function loadLog() {
+function loadLog() {
   const filterDept = document.getElementById('log-dept-filter').value;
-  let query = db.from('assets').select('*').eq('is_checked', true).order('checked_at', { ascending: false }).limit(60);
-  if (filterDept) query = query.eq('department', filterDept);
+  let logs = mockAssets.filter(a => a.is_checked).sort((a,b) => new Date(b.checked_at) - new Date(a.checked_at));
+  if (filterDept) logs = logs.filter(l => l.department === filterDept);
   
-  const { data: logs } = await query;
-  const html = (logs || []).map(l => `
+  const html = logs.map(l => `
     <div class="log-item">
       <div style="display:flex;justify-content:space-between;align-items:center;">
         <span class="log-name">${l.item_name} <span class="badge badge-dept" style="font-size:10px;padding:2px 6px;">${l.department}</span></span>
@@ -1269,61 +1180,45 @@ async function loadLog() {
   document.getElementById('log-list').innerHTML = html || '<div class="empty">체크 완료된 로그가 없습니다.</div>';
 }
 
-async function addDept() {
-  const inp = document.getElementById('new-dept-input');
-  const name = inp.value.trim();
-  if (!name) return;
-  alert('안내: 부서는 자산 등록 시 자동으로 생성 및 관리됩니다. 자산 추가 프로세스를 진행해 주세요.');
-  inp.value = '';
-}
-
-async function uploadCSV(event) {
+function uploadCSV(event) {
   const file = event.target.files[0];
   if (!file) return;
   const targetDept = document.getElementById('upload-dept-sel').value;
   if (!targetDept) { alert('업로드할 대상 부서를 명확히 선택해주세요.'); return; }
 
   const reader = new FileReader();
-  reader.onload = async function(e) {
+  reader.onload = function(e) {
     const text = e.target.result;
     const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
     if (lines.length <= 1) { alert('업로드할 자산 데이터 행이 없습니다.'); return; }
 
-    const assets = [];
+    let addedCount = 0;
     for (let i = 1; i < lines.length; i++) {
       const row = lines[i].split(',').map(cell => cell.trim().replace(/^"|"$/g, ''));
       if (row.length < 3 || !row[0]) continue;
-      assets.push({
+      
+      const assetObj = {
         asset_id: row[0], item_name: row[1], location: row[2],
         price: row[3] ? parseInt(row[3].replace(/[^0-9]/g, '')) || 0 : 0,
         department: row[4] || targetDept, registration_date: row[5] || null,
         registration_number: row[6] || null, accounting_type: row[7] || '대학회계',
         is_checked: false
-      });
+      };
+
+      // 로컬 배열에서 중복 제거 및 Upsert 구현
+      const existingIdx = mockAssets.findIndex(a => a.asset_id === assetObj.asset_id);
+      if (existingIdx > -1) mockAssets[existingIdx] = assetObj;
+      else mockAssets.push(assetObj);
+      addedCount++;
     }
 
-    if (!assets.length) { alert('유효한 데이터 형식이 존재하지 않습니다.'); return; }
-    document.getElementById('upload-result').textContent = `⏳ 자산 ${assets.length}건을 Supabase 원격 서버에 전송 중...`;
-
-    const chunk = 100;
-    let successCount = 0;
-    for (let i = 0; i < assets.length; i += chunk) {
-      const sub = assets.slice(i, i + chunk);
-      const { error } = await db.from('assets').upsert(sub, { onConflict: 'asset_id' });
-      if (error) {
-        alert('업로드 프로세스 오류: ' + error.message);
-        return;
-      }
-      successCount += sub.length;
-    }
-
-    document.getElementById('upload-result').textContent = `✅ 성공: 총 ${successCount}건의 자산 정보가 병합되었습니다.`;
-    loadAssets(); loadDeptSummary();
+    document.getElementById('upload-result').textContent = `✅ 성공: 로컬 메모리에 총 ${addedCount}건의 자산 정보가 등록(병합)되었습니다.`;
+    loadAssets(); loadDeptSummary(); loadDepts();
   };
   reader.readAsText(file, 'EUC-KR');
 }
 
-async function addAsset() {
+function addAsset() {
   const id = document.getElementById('m-id').value.trim();
   const name = document.getElementById('m-name').value.trim();
   const loc = document.getElementById('m-loc').value.trim();
@@ -1334,29 +1229,28 @@ async function addAsset() {
 
   if (!id || !name || !dept) { alert('자산번호, 품목명, 부서는 필수 입력 값입니다.'); return; }
 
-  const { error } = await db.from('assets').insert({
+  const existing = mockAssets.find(a => a.asset_id === id);
+  if(existing) { alert('이미 존재하는 자산번호입니다.'); return; }
+
+  mockAssets.push({
     asset_id: id, item_name: name, location: loc, price: price,
     department: dept, registration_date: date, accounting_type: acct, is_checked: false
   });
 
-  if (error) alert('자산 추가 오류: ' + error.message);
-  else {
-    alert('자산이 성공적으로 추가되었습니다.');
-    ['m-id','m-name','m-loc','m-price','m-date'].forEach(id => document.getElementById(id).value = '');
-    loadAssets(); loadDeptSummary();
-  }
+  alert('자산이 가상 데이터셋에 성공적으로 추가되었습니다.');
+  ['m-id','m-name','m-loc','m-price','m-date'].forEach(id => document.getElementById(id).value = '');
+  loadAssets(); loadDeptSummary(); loadDepts();
 }
 
-async function loadAssets() {
+function loadAssets() {
   const filterDept = document.getElementById('asset-filter').value;
   const filterAcct = document.getElementById('asset-acct-filter').value;
   
-  let query = db.from('assets').select('*').order('asset_id', { ascending: true });
-  if (filterDept) query = query.eq('department', filterDept);
-  if (filterAcct) query = query.eq('accounting_type', filterAcct);
+  let list = [...mockAssets].sort((a,b) => a.asset_id.localeCompare(b.asset_id));
+  if (filterDept) list = list.filter(a => a.department === filterDept);
+  if (filterAcct) list = list.filter(a => a.accounting_type === filterAcct);
   
-  const { data: list } = await query;
-  const html = (list || []).map(a => `
+  const html = list.map(a => `
     <div class="asset-item">
       <div class="asset-check">${a.is_checked ? '✅' : '⬜'}</div>
       <div class="asset-info">
@@ -1370,20 +1264,19 @@ async function loadAssets() {
   document.getElementById('asset-list').innerHTML = html || '<div class="empty">조건에 부합하는 자산 목록이 없습니다.</div>';
 }
 
-async function deleteAsset(id) {
-  if (confirm(`⚠️ 정말로 자산번호 [${id}] 물품을 시스템에서 영구 삭제하시겠습니까?`)) {
-    await db.from('assets').delete().eq('asset_id', id);
-    loadAssets(); loadDeptSummary();
+function deleteAsset(id) {
+  if (confirm(`⚠️ 정말로 자산번호 [${id}] 물품을 시스템에서 삭제하시겠습니까?`)) {
+    mockAssets = mockAssets.filter(a => a.asset_id !== id);
+    loadAssets(); loadDeptSummary(); loadDepts();
   }
 }
 
-async function loadAdminRequests() {
+function loadAdminRequests() {
   const filter = document.getElementById('req-status-filter').value;
-  let query = db.from('change_requests').select('*').order('created_at', { ascending: false });
-  if (filter) query = query.eq('status', filter);
+  let list = [...mockRequests].sort((a,b)=>new Date(b.created_at)-new Date(a.created_at));
+  if (filter) list = list.filter(r => r.status === filter);
   
-  const { data } = await query;
-  const html = (data || []).map(r => {
+  const html = list.map(r => {
     const isPending = r.status === '대기중';
     return `<div class="card" style="margin-bottom:8px;padding:12px;">
       <div style="display:flex;justify-content:space-between;align-items:start;gap:10px;">
@@ -1404,16 +1297,21 @@ async function loadAdminRequests() {
   document.getElementById('admin-request-list').innerHTML = html || '<div class="empty">변경 신청 내역이 존재하지 않습니다.</div>';
 }
 
-async function reviewRequest(id, status, assetId, newLoc) {
-  const { error } = await db.from('change_requests').update({
-    status, reviewed_by: currentUser.name, reviewed_at: new Date().toISOString()
-  }).eq('id', id);
-  if (error) { alert('오류: ' + error.message); return; }
-  if (status === '승인' && newLoc) {
-    await db.from('assets').update({ location: newLoc }).eq('asset_id', assetId);
+function reviewRequest(id, status, assetId, newLoc) {
+  const req = mockRequests.find(r => r.id === id);
+  if(req) {
+    req.status = status;
+    req.reviewed_by = currentUser.name;
+    req.reviewed_at = new Date().toISOString();
+    
+    if (status === '승인' && newLoc) {
+      const asset = mockAssets.find(a => a.asset_id === assetId);
+      if(asset) asset.location = newLoc;
+    }
+    alert(`정상적으로 ${status} 처리 완료되었습니다.`);
+    loadAdminRequests();
+    triggerLocalUpdate();
   }
-  alert(`정상적으로 ${status} 처리 완료되었습니다.`);
-  loadAdminRequests();
 }
 </script>
 </body>
